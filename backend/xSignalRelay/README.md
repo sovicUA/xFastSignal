@@ -18,9 +18,22 @@
 | GET   | `/`           | Сторінка статусу Signal (без авторизації). |
 | GET   | `/health`     | Ліваність (без авторизації). |
 | GET   | `/api/status` | JSON для сторінки статусу (без авторизації). |
+| GET   | `/swagger`    | Swagger UI. Поза Development — за ключем (див. нижче). |
+| GET   | `/openapi/v1.json` | OpenAPI-документ. Поза Development — за ключем. |
 | GET   | `/templates`  | `[{ id, name, params: [...] }]` — доступні шаблони. |
 | GET   | `/recipients` | `[{ id, kind, displayName }]` — allowlist (без сирих номерів). |
 | POST  | `/send`       | `{ templateId, target, params? }` → `202 { sent: true }`. |
+
+### Swagger / OpenAPI
+
+`Microsoft.AspNetCore.OpenApi` генерує документ, `Swashbuckle.AspNetCore.SwaggerUI` — UI.
+У документі є схема безпеки `X-Api-Key` — кнопка **Authorize** у UI дозволяє викликати
+`/send` та інші захищені ендпоінти прямо зі сторінки.
+
+Доступ до самого `/swagger` і `/openapi`:
+- **Development** — вільний;
+- **інакше** — за ключем: заголовок `X-Api-Key: <ApiKey>` (curl) або Basic-логін
+  (браузер сам покаже вікно; логін будь-який, пароль = `ApiKey`).
 
 ### Сторінка статусу
 
