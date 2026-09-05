@@ -1,0 +1,28 @@
+# Піднімає лише relay. signal-cli НЕ дублюється тут — його запускає compose xBot
+# (два daemon на одному томі конфігу конфліктують). Мережа xbot-network оголошена external,
+# тож спершу `docker compose up -d` у c:\src\xBot, потім тут.
+#
+# Запуск: RELAY_API_KEY=... docker compose up -d --build
+# (або покласти RELAY_API_KEY у .env поряд із цим файлом)
+
+networks:
+  xbot-network:
+    external: true
+
+services:
+  xsignalrelay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xsignalrelay
+    environment:
+      - Signal__BaseUrl=http://signal-cli:8080
+      - ApiKey=${RELAY_API_KEY:?Задайте RELAY_API_KEY (env або .env)}
+      - Db__Path=/app/data/relay.db
+    networks:
+      - xbot-network
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./relay-data:/app/data
+    restart: unless-stopped
