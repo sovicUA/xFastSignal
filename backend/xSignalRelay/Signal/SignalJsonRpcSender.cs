@@ -19,6 +19,20 @@ public sealed class SignalJsonRpcSender(HttpClient http, ILogger<SignalJsonRpcSe
     public Task SendToGroupAsync(string message, string groupId, CancellationToken ct = default) =>
         SendAsync(new SignalSendParams { Message = message, GroupId = groupId }, ct);
 
+    public async Task<string> GetVersionAsync(CancellationToken ct = default)
+    {
+        var request = new SignalJsonRpcRequest<SignalEmptyParams> { Method = "version", Params = new SignalEmptyParams() };
+
+        var response = await http.PostAsJsonAsync("/api/v1/rpc", request, ct);
+        response.EnsureSuccessStatusCode();
+
+        var rpc = await response.Content.ReadFromJsonAsync<SignalJsonRpcResponse<SignalVersionResult>>(ct);
+        if (rpc?.Error is { } error)
+            throw new InvalidOperationException($"signal-cli JSON-RPC помилка {error.Code}: {error.Message}");
+
+        return rpc?.Result?.Version ?? "невідомо";
+    }
+
     /// <summary>
     /// До 3 спроб з невеликою паузою: на "холодному старті" (щойно піднятий daemon) перший
     /// виклик іноді падає з "Failed to send message" без деталей, а миттєвий ідентичний повтор

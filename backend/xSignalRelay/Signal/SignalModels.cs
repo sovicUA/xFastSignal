@@ -37,3 +37,12 @@ public sealed class SignalSendParams
     [JsonPropertyName("recipient")] public List<string>? Recipient { get; set; }
     [JsonPropertyName("groupId")] public string? GroupId { get; set; }
 }
+
+/// <summary>Params для методів без аргументів (напр. "version") — серіалізується як "{}".</summary>
+public sealed class SignalEmptyParams;
+
+/// <summary>Result методу "version".</summary>
+public sealed class SignalVersionResult
+{
+    [JsonPropertyName("version")] public string? Version { get; set; }
+}
