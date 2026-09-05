@@ -22,7 +22,10 @@ public static class CatalogEndpoints
                 .ToList();
 
             return Results.Ok(dtos);
-        });
+        })
+        .WithSummary("Список активних шаблонів")
+        .WithDescription("`params` — імена плейсхолдерів {key} у тілі шаблону, які треба передати в /send.")
+        .Produces<IReadOnlyList<TemplateDto>>();
 
         app.MapGet("/recipients", async (RelayDbContext db, CancellationToken ct) =>
         {
@@ -33,6 +36,9 @@ public static class CatalogEndpoints
                 .ToListAsync(ct);
 
             return Results.Ok(dtos);
-        });
+        })
+        .WithSummary("Allowlist одержувачів")
+        .WithDescription("Лише `id`/`kind`/`displayName`. Сирі номери та groupId не повертаються.")
+        .Produces<IReadOnlyList<RecipientDto>>();
     }
 }

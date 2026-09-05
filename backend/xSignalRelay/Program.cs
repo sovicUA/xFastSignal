@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using xSignalRelay.Auth;
 using xSignalRelay.Data;
 using xSignalRelay.Endpoints;
+using xSignalRelay.OpenApi;
 using xSignalRelay.Services.Status;
 using xSignalRelay.Signal;
 
@@ -22,6 +23,8 @@ builder.Services.AddHttpClient<ISignalSender, SignalJsonRpcSender>(client =>
 builder.Services.AddSingleton<ISignalStatusRegistry, SignalStatusRegistry>();
 builder.Services.AddHostedService<SignalHealthCheckService>();
 
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer<ApiKeySecuritySchemeTransformer>());
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -36,10 +39,39 @@ using (var scope = app.Services.CreateScope())
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-app.MapGet("/api/status", (ISignalStatusRegistry registry) => registry.Get());
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+    .ExcludeFromDescription();
+app.MapGet("/api/status", (ISignalStatusRegistry registry) => registry.Get())
+    .WithTags("Статус")
+    .WithSummary("Поточний стан Signal для сторінки на \"/\" (без авторизації).");
 
-var api = app.MapGroup("").AddEndpointFilter<ApiKeyFilter>();
+// Swagger: поза Development сам UI і openapi.json — за ключем (X-Api-Key або Basic-пароль).
+if (!app.Environment.IsDevelopment())
+{
+    app.Use(async (context, next) =>
+    {
+        var path = context.Request.Path;
+        if ((path.StartsWithSegments("/swagger") || path.StartsWithSegments("/openapi"))
+            && !SwaggerAccess.IsAuthorized(context, builder.Configuration["ApiKey"]))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.Headers.WWWAuthenticate = $"Basic realm=\"{SwaggerAccess.Realm}\"";
+            return;
+        }
+
+        await next();
+    });
+}
+
+app.MapOpenApi();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/openapi/v1.json", "xSignalRelay v1");
+    options.RoutePrefix = "swagger";
+    options.DocumentTitle = "xSignalRelay API";
+});
+
+var api = app.MapGroup("").AddEndpointFilter<ApiKeyFilter>().WithTags("Signal Relay");
 api.MapSendEndpoints();
 api.MapCatalogEndpoints();
 

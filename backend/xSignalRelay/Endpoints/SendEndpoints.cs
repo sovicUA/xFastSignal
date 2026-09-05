@@ -62,7 +62,17 @@ public static class SendEndpoints
             log.LogInformation("Надіслано шаблон {TemplateId} до {RecipientId}", template.Id, recipient.Id);
             status.ReportSent($"{recipient.DisplayName} ← «{template.Name}»");
             return Results.Accepted(value: new { sent = true });
-        });
+        })
+        .WithSummary("Надіслати шаблон одержувачу")
+        .WithDescription(
+            "`target` — це `id` з /recipients, не номер телефону. `params` обов'язкові, якщо шаблон має плейсхолдери.\n\n" +
+            "202 — прийнято; 400 — немає полів / бракує значення плейсхолдера; 404 — немає шаблону; " +
+            "403 — одержувач не в allowlist; 502 — signal-cli не надіслав.")
+        .Produces(StatusCodes.Status202Accepted)
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status403Forbidden)
+        .Produces(StatusCodes.Status404NotFound)
+        .Produces(StatusCodes.Status502BadGateway);
     }
 
     /// <summary>Категорія логера для ендпоінта /send.</summary>
