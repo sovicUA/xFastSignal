@@ -9,6 +9,9 @@ networks:
   xbot-network:
     external: true
 
+volumes:
+  relay-data:
+
 services:
   xsignalrelay:
     build:
@@ -24,5 +27,5 @@ services:
     ports:
       - "8082:8080"
     volumes:
-      - ./relay-data:/app/data
+      - relay-data:/app/data
     restart: unless-stopped
