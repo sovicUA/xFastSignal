@@ -1,17 +1,49 @@
-# xfastsignal
+# xFastSignal
 
-A new Flutter project.
+Android-застосунок для швидкої — в ідеалі автоматичної — відправки заздалегідь
+визначених повідомлень у **Signal**, без ручного відкриття Signal і вибору контакту
+щоразу (кнопки / App Shortcuts / Direct Share).
 
-## Getting Started
+> Статус: рання розробка. Flutter-клієнт поки що заготовка; готовий бекенд-мікросервіс
+> `xSignalRelay`. Історія рішень — у [NOTES.md](NOTES.md).
 
-This project is a starting point for a Flutter application.
+## Архітектура
 
-A few resources to get you started if this is your first Flutter project:
+Три рівні:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+1. **signal-cli** (daemon у контейнері) — тримає зареєстрований/лінкований номер Signal,
+   говорить JSON-RPC. Спільний із проєктом `xBot`.
+2. **[`backend/xSignalRelay`](backend/xSignalRelay)** — тонкий ASP.NET Core (net10.0)
+   мікросервіс: приймає авторизований запит «надішли шаблон X одержувачу Y» і виконує
+   його через signal-cli. SQLite для шаблонів і allowlist одержувачів; клієнт бачить
+   одержувачів лише за opaque `id` — сирі номери не залишають бекенд. Має сторінку
+   статусу (`/`) і Swagger (`/swagger`).
+3. **xFastSignal** (цей Flutter-застосунок, лише Android) — б'є в `POST /send` мікросервіса.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Клієнт свідомо не дублює інтеграцію з signal-cli. Деталі й відкинуті альтернативи —
+у [NOTES.md](NOTES.md).
+
+## Структура репозиторію
+
+| Шлях | Що |
+|------|-----|
+| `lib/`, `android/` | Flutter-застосунок (org `ua.vn.log`, `applicationId ua.vn.log.xfastsignal`) |
+| `backend/xSignalRelay/` | бекенд-мікросервіс — див. його [README](backend/xSignalRelay/README.md) |
+| `NOTES.md` | архітектурні рішення та їх обґрунтування |
+
+## Розробка
+
+Клієнт:
+
+```sh
+flutter pub get
+flutter run
+```
+
+Бекенд — див. [backend/xSignalRelay/README.md](backend/xSignalRelay/README.md).
+
+## Безпека
+
+Ендпоінт мікросервіса надсилає повідомлення від імені прив'язаного номера, тому
+можливості навмисно звужені: **фіксовані шаблони** + **allowlist одержувачів**,
+не «довільний текст на будь-який номер».
