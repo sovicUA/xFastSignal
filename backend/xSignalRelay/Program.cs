@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using xSignalRelay.Auth;
 using xSignalRelay.Data;
 using xSignalRelay.Endpoints;
+using xSignalRelay.Services.Status;
 using xSignalRelay.Signal;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,9 @@ builder.Services.AddHttpClient<ISignalSender, SignalJsonRpcSender>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+builder.Services.AddSingleton<ISignalStatusRegistry, SignalStatusRegistry>();
+builder.Services.AddHostedService<SignalHealthCheckService>();
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -28,7 +32,12 @@ using (var scope = app.Services.CreateScope())
     DbSeeder.Seed(db, builder.Configuration, services.GetRequiredService<ILogger<Program>>());
 }
 
+// Сторінка статусу на "/" (wwwroot/index.html) + її API — без авторизації, як дашборд xBot.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/api/status", (ISignalStatusRegistry registry) => registry.Get());
 
 var api = app.MapGroup("").AddEndpointFilter<ApiKeyFilter>();
 api.MapSendEndpoints();

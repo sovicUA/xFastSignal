@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using xSignalRelay.Contracts;
 using xSignalRelay.Data;
+using xSignalRelay.Services.Status;
 using xSignalRelay.Signal;
 using xSignalRelay.Templating;
 
@@ -14,6 +15,7 @@ public static class SendEndpoints
             SendRequest body,
             RelayDbContext db,
             ISignalSender signal,
+            ISignalStatusRegistry status,
             ILogger<SendMarker> log,
             CancellationToken ct) =>
         {
@@ -58,6 +60,7 @@ public static class SendEndpoints
             }
 
             log.LogInformation("Надіслано шаблон {TemplateId} до {RecipientId}", template.Id, recipient.Id);
+            status.ReportSent($"{recipient.DisplayName} ← «{template.Name}»");
             return Results.Accepted(value: new { sent = true });
         });
     }
