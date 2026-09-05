@@ -1,0 +1,8 @@
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+relay-data/
+appsettings.Development.json
+.vs/
