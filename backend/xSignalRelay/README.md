@@ -50,13 +50,13 @@
 
 ## Локальний запуск
 
-```sh
-# signal-cli daemon (з репо xBot):
-cd ../../../xBot && SIGNAL_PHONE_NUMBER=+380XXXXXXXXX docker compose -f docker-compose.signal.yml up -d
+signal-cli daemon тут не піднімається — він працює на окремому (вилученому) сервері.
+Вкажіть його адресу через env var (замовч. `Signal:BaseUrl` = `http://localhost:8080`,
+для локальної розробки без реального signal-cli не підійде):
 
-cd -
-dotnet run
-# слухає http://localhost:5xxx; Signal:BaseUrl за замовч. http://localhost:8080
+```sh
+Signal__BaseUrl=http://<host-з-signal-cli>:<port> dotnet run
+# слухає http://localhost:5xxx
 ```
 
 У `appsettings.Development.json` вже є `ApiKey=dev-local-key` і `Seed` з кількома
@@ -73,11 +73,9 @@ curl -X POST http://localhost:5xxx/send \
 ## Docker
 
 ```sh
-# спершу signal-cli + xbot:
-cd ../../../xBot && SIGNAL_PHONE_NUMBER=+380XXXXXXXXX docker compose up -d
-cd -
-RELAY_API_KEY=$(openssl rand -hex 24) docker compose up -d --build
-# relay на порту 8082 хоста; всередині мережі — http://xsignalrelay:8080
+RELAY_API_KEY=$(openssl rand -hex 24) SIGNAL_BASE_URL=http://<host-з-signal-cli>:<port> \
+  docker compose up -d --build
+# relay на порту 8082 хоста
 ```
 
 ## Конфігурація
