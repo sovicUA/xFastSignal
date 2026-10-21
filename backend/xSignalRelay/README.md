@@ -66,7 +66,7 @@ Signal__BaseUrl=http://<host-з-signal-cli>:<port> dotnet run
 
 ```sh
 IP=$(ssh <signal-host> 'docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" <signal-cli-container>')
-ssh -N -L 18080:$IP:8080 <signal-host> &
+ssh -N -o ServerAliveInterval=30 -L 18080:$IP:8080 <signal-host> &   # keepalive: без нього тунель рветься в простої
 Signal__BaseUrl=http://localhost:18080 dotnet run
 ```
 
