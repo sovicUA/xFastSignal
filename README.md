@@ -5,14 +5,16 @@ Android-застосунок для швидкої — в ідеалі авто�
 щоразу (кнопки / App Shortcuts / Direct Share).
 
 > Статус: рання розробка. Flutter-клієнт поки що заготовка; готовий бекенд-мікросервіс
-> `xSignalRelay`. Історія рішень — у [NOTES.md](NOTES.md).
+> `xSignalRelay`. Стан, наступні кроки та історія рішень — у [NOTES.md](NOTES.md).
+>
+> Репозиторій: `<internal-git>/xFastSignal.git` (Forgejo).
 
 ## Архітектура
 
 Три рівні:
 
-1. **signal-cli** (daemon у контейнері) — тримає зареєстрований/лінкований номер Signal,
-   говорить JSON-RPC. Спільний із проєктом `xBot`.
+1. **signal-cli** (daemon у контейнері на окремому сервері) — тримає
+   зареєстрований/лінкований номер Signal, говорить JSON-RPC. Образ — з проєкту `xBot`.
 2. **[`backend/xSignalRelay`](backend/xSignalRelay)** — тонкий ASP.NET Core (net10.0)
    мікросервіс: приймає авторизований запит «надішли шаблон X одержувачу Y» і виконує
    його через signal-cli. SQLite для шаблонів і allowlist одержувачів; клієнт бачить

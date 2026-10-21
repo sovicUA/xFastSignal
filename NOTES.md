@@ -1,6 +1,7 @@
-# xFastSignal — нотатки з обговорення (початок проєкту)
+# xFastSignal — нотатки та архітектурні рішення
 
-Дата: 2026-09-05
+Початок: 2026-09-05. Поточний стан і наступні кроки — розділи «Стан проєкту» і
+«Наступні кроки» нижче.
 Сесія-джерело: обговорення велось у теці xSilent, перед перемиканням на xFastSignal.
 
 ## Ідея
@@ -49,37 +50,62 @@ Android-застосунок для швидкої (в ідеалі — авто
   довелось би вирішувати в самому Flutter-додатку, а не перевикористовувати те, що
   xBot вже вирішив.
 
-### Безпека (озвучено, ще не спроєктовано)
+> **Переглянуто (2026-09-05, та сама сесія):** ендпоінт **не** додається в xBot —
+> замість цього окремий мікросервіс `backend/xSignalRelay`, який сам ходить до
+> signal-cli по JSON-RPC (метод `send`, send-only). xBot не змінюється.
+> **Переглянуто (2026-09-15):** signal-cli працює на окремому (вилученому) сервері;
+> relay звертається до нього за `SIGNAL_BASE_URL`, без спільної docker-мережі з xBot.
 
-Ендпоінт у xBot фактично надсилає повідомлення від імені прив'язаного номера —
-тому пропозиція звужувати можливості не до "довільний текст на будь-який номер",
-а до:
-- фіксованих шаблонів повідомлень,
+### Безпека
+
+Ендпоінт фактично надсилає повідомлення від імені прив'язаного номера — тому
+можливості звужено не до "довільний текст на будь-який номер", а до:
+- фіксованих шаблонів повідомлень (з плейсхолдерами),
 - allowlist одержувачів (контактів/груп).
 
-## Стан проєкту xFastSignal
+Реалізовано в xSignalRelay: шаблони й allowlist у SQLite, клієнт бачить одержувачів
+лише за opaque `id` (сирі номери/groupId не залишають бекенд), авторизація —
+заголовок `X-Api-Key`.
 
-- Створено заготовку: `flutter create --org ua.vn.log --project-name xfastsignal
-  --platforms android -a kotlin`.
+## Стан проєкту (оновлено 2026-10-21)
+
+**Бекенд `xSignalRelay` — робочий:**
+- `GET /templates`, `GET /recipients`, `POST /send` (коди `400/403/404/502`),
+  авторизація `X-Api-Key`.
+- SQLite (EF Core, міграція `Initial`), сид демо-даних з конфіга.
+- Сторінка статусу `/` (health check signal-cli кожні 30 с, останні 5 відправок),
+  Swagger `/swagger` (поза Development — за ключем).
+- Docker: `docker compose up` з `RELAY_API_KEY` + `SIGNAL_BASE_URL`, порт 8082,
+  том `relay-data`.
+
+**Клієнт Flutter — лише заготовка `flutter create`:**
+- `flutter create --org ua.vn.log --project-name xfastsignal --platforms android -a kotlin`.
 - **Org/домен**: `ua.vn.log` (зворотнє від домену користувача `log.vn.ua`) —
   свідомо відмінний від `ua.org.sovic`, який використовується в xSilent.
-- `applicationId = ua.vn.log.xfastsignal`.
-- Лише Android-платформа (iOS/desktop не генерувались).
-- Залежності (riverpod, http/dio-клієнт) — **ще не додані**, як і структура папок.
-- Git-репозиторій у xFastSignal **ще не ініціалізовано**.
+- `applicationId = ua.vn.log.xfastsignal`, лише Android.
+- Залежності (riverpod, http/dio-клієнт) **ще не додані**, структури папок немає.
 
-## Відкриті питання / наступні кроки
+**Репозиторій:** `<internal-git>/xFastSignal.git` (Forgejo, основний,
+з 2026-10-21). GitHub `sovicUA/xFastSignal` — попередній origin.
 
-1. Контракт API у xBot: форма запиту/відповіді, коди помилок, спосіб автентифікації
-   (API key в заголовку? JWT?).
-2. Модель шаблонів повідомлень і allowlist одержувачів — де зберігається
-   (конфіг xBot? БД? редагується з xFastSignal чи лише на бекенді?).
-3. Чи endpoint — це новий контролер у xBot, чи виокремлений мікросервіс.
-4. Базові залежності й структура xFastSignal (riverpod + http/dio, за зразком
-   xSilent: drift + Riverpod + flutter_local_notifications — але тут можливо не
-   всі ці шари потрібні).
-5. UI xFastSignal: екран швидких кнопок / App Shortcuts / Direct Share для
-   миттєвого виклику потрібного шаблону.
+## Вирішені питання
+
+1. ~~Контракт API~~ → `POST /send { templateId, target, params? }` → `202`,
+   `X-Api-Key` у заголовку. Деталі — `backend/xSignalRelay/README.md`.
+2. ~~Де зберігаються шаблони/allowlist~~ → SQLite мікросервісу; поки що наповнюється
+   сидом або правкою БД (admin-CRUD — у планах).
+3. ~~Контролер у xBot чи мікросервіс~~ → окремий мікросервіс xSignalRelay.
+
+## Наступні кроки
+
+1. **Клієнт:** залежності (Riverpod + http/dio) і структура папок; екран
+   налаштувань (URL relay + API-ключ у secure storage); завантаження
+   `/templates` + `/recipients`; екран швидких кнопок → `POST /send`.
+2. **Клієнт:** App Shortcuts (відправка з іконки без відкриття застосунку),
+   далі — Direct Share / віджет.
+3. **Бекенд:** admin-CRUD шаблонів і allowlist, rate limiting на `/send`, кілька
+   API-ключів, валідація `Recipient.Value` (E.164 / groupId).
+4. **Деплой** relay поруч із вилученим signal-cli і перевірка на фізичному пристрої.
 
 ## Перенесення розробки на Mac (2026-09-15)
 
@@ -125,7 +151,9 @@ Android-застосунок для швидкої (в ідеалі — авто
   env var `SIGNAL_BASE_URL` (коміт `602e7de`).
 - **`origin` remote** xFastSignal переключено з HTTPS на SSH
   (`git@github.com:sovicUA/xFastSignal.git`) — HTTPS на цьому Mac не мав
-  налаштованих credentials.
+  налаштованих credentials. *(З 2026-10-21 основний — <git-server>, див. «Стан проєкту»;
+  на Mac треба `git remote set-url origin <internal-git>/xFastSignal.git`
+  і SSH-ключ для <git-server>, порт 2222.)*
 
 ### Не зроблено / відкрито
 
