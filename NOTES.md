@@ -78,12 +78,21 @@ Android-застосунок для швидкої (в ідеалі — авто
 - Docker: `docker compose up` з `RELAY_API_KEY` + `SIGNAL_BASE_URL`, порт 8082,
   том `relay-data`.
 
-**Клієнт Flutter — лише заготовка `flutter create`:**
+**Клієнт Flutter — каркас (2026-10-21):**
 - `flutter create --org ua.vn.log --project-name xfastsignal --platforms android -a kotlin`.
 - **Org/домен**: `ua.vn.log` (зворотнє від домену користувача `log.vn.ua`) —
   свідомо відмінний від `ua.org.sovic`, який використовується в xSilent.
 - `applicationId = ua.vn.log.xfastsignal`, лише Android.
-- Залежності (riverpod, http/dio-клієнт) **ще не додані**, структури папок немає.
+- Залежності: `flutter_riverpod` 2 (ручні `Notifier`, як у xSilent), `dio`,
+  `flutter_secure_storage` (API-ключ), `shared_preferences` (URL, згодом — кнопки).
+- `lib/`: `models/catalog.dart`, `services/relay_client.dart` (контракт relay +
+  людські повідомлення помилок), `services/relay_settings.dart`, `providers.dart`,
+  `screens/settings_screen.dart` (URL + ключ, «Перевірити з'єднання»),
+  `screens/home_screen.dart` (поки що — список шаблонів/одержувачів з relay).
+- Debug-збірка дозволяє cleartext HTTP до `10.0.2.2`/`localhost`
+  (`android/app/src/debug/res/xml/network_security_config.xml`); release — лише HTTPS.
+  Для `https://…<internal-domain>` у release треба буде довіра до внутрішнього CA.
+- **Ще немає:** кнопок (шаблон → одержувач), відправки з UI, App Shortcuts.
 
 **Репозиторій:** `<internal-git>/xFastSignal.git` (Forgejo, основний,
 з 2026-10-21). GitHub `sovicUA/xFastSignal` — попередній origin.
@@ -116,9 +125,8 @@ Android-застосунок для швидкої (в ідеалі — авто
 
 ## Наступні кроки
 
-1. **Клієнт:** залежності (Riverpod + http/dio) і структура папок; екран
-   налаштувань (URL relay + API-ключ у secure storage); завантаження
-   `/templates` + `/recipients`; екран швидких кнопок → `POST /send`.
+1. **Клієнт:** ~~каркас + налаштування + каталог~~ ✅; модель і сховище кнопок,
+   редактор кнопки, сітка кнопок на головному з відправкою й Undo.
 2. **Клієнт:** App Shortcuts (відправка з іконки без відкриття застосунку),
    далі — Direct Share / віджет.
 3. **Бекенд:** admin-CRUD шаблонів і allowlist, rate limiting на `/send`, кілька

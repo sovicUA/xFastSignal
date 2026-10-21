@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Лише для debug-збірки: cleartext HTTP до relay на машині розробника.
+     Release ходить тільки по HTTPS (див. NOTES.md — довіра до внутрішнього CA). -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
