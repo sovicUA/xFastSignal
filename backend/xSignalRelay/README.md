@@ -60,6 +60,18 @@ Signal__BaseUrl=http://<host-з-signal-cli>:<port> dotnet run
 # слухає http://localhost:5xxx
 ```
 
+**Розробка проти signal-cli xBot на `<signal-host>`.** Контейнер `<signal-cli-container>` сидить лише
+в docker-мережі `<xbot-network>` (порт на хост не опубліковано), тож — SSH-тунель на IP
+контейнера (IP може змінитися після перезапуску — дивіться щоразу):
+
+```sh
+IP=$(ssh <signal-host> 'docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" <signal-cli-container>')
+ssh -N -L 18080:$IP:8080 <signal-host> &
+Signal__BaseUrl=http://localhost:18080 dotnet run
+```
+
+⚠️ Це **бойовий номер xBot** — `/send` реально надсилає повідомлення від його імені.
+
 У `appsettings.Development.json` вже є `ApiKey=dev-local-key` і `Seed` з кількома
 демо-шаблонами (щоб `/send` було на чому тестувати). Замініть номер у `Seed:Recipients`
 на реальний або відредагуйте таблицю `Recipients` напряму.
