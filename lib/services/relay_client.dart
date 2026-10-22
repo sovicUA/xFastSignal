@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 import '../models/catalog.dart';
+import 'trusted_ca.dart';
 
 /// Помилка звернення до relay з повідомленням, придатним для показу користувачу.
 class RelayException implements Exception {
@@ -14,9 +17,11 @@ class RelayException implements Exception {
 }
 
 /// HTTP-клієнт до xSignalRelay. Контракт — `backend/xSignalRelay/README.md`.
+/// [trustedCa] — CA, якому довіряти додатково до системних (relay за внутрішнім HTTPS).
 class RelayClient {
-  RelayClient({required String baseUrl, required String apiKey, Dio? dio})
+  RelayClient({required String baseUrl, required String apiKey, TrustedCa? trustedCa, Dio? dio})
       : _dio = dio ?? Dio() {
+    if (dio == null && trustedCa != null) _dio.httpClientAdapter = trustingAdapter(trustedCa);
     _dio.options
       ..baseUrl = baseUrl
       ..connectTimeout = const Duration(seconds: 5)
@@ -72,6 +77,9 @@ class RelayClient {
         DioExceptionType.receiveTimeout ||
         DioExceptionType.sendTimeout =>
           'Relay не відповідає (тайм-аут)',
+        DioExceptionType.badCertificate => 'Сертифікат relay не довірений — імпортуйте CA в налаштуваннях',
+        _ when e.error is HandshakeException =>
+          'Сертифікат relay не довірений — імпортуйте CA в налаштуваннях',
         _ => 'Немає з\'єднання з relay',
       });
     }

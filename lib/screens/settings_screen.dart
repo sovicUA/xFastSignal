@@ -1,10 +1,13 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/relay_client.dart';
 import '../services/relay_settings.dart';
+import '../services/trusted_ca.dart';
 
-/// Адреса relay + API-ключ, з перевіркою з'єднання перед збереженням.
+/// Адреса relay + API-ключ (+ CA для внутрішнього HTTPS), з перевіркою з'єднання перед
+/// збереженням.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -18,6 +21,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _keyController = TextEditingController();
   bool _obscureKey = true;
   bool _checking = false;
+  TrustedCa? _trustedCa;
 
   /// Результат останньої перевірки: (успіх, текст).
   (bool, String)? _checkResult;
@@ -28,6 +32,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final current = ref.read(relaySettingsProvider).valueOrNull ?? RelaySettings.empty;
     _urlController.text = current.baseUrl;
     _keyController.text = current.apiKey;
+    _trustedCa = current.trustedCa;
   }
 
   @override
@@ -40,7 +45,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   RelaySettings get _entered => RelaySettings(
         baseUrl: normalizeBaseUrl(_urlController.text) ?? '',
         apiKey: _keyController.text.trim(),
+        trustedCa: _trustedCa,
       );
+
+  Future<void> _importCa() async {
+    final file = await FilePicker.pickFile(dialogTitle: 'Кореневий сертифікат CA');
+    if (file == null) return;
+    try {
+      final pem = parseCaCertificate(await file.readAsBytes());
+      setState(() {
+        _trustedCa = TrustedCa(name: file.name, pem: pem);
+        _checkResult = null;
+      });
+    } on TrustedCaException catch (e) {
+      setState(() => _checkResult = (false, e.message));
+    }
+  }
 
   Future<void> _check() async {
     if (!_formKey.currentState!.validate()) return;
@@ -50,7 +70,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
     final settings = _entered;
     try {
-      final catalog = await RelayClient(baseUrl: settings.baseUrl, apiKey: settings.apiKey).catalog();
+      final catalog = await RelayClient(
+        baseUrl: settings.baseUrl,
+        apiKey: settings.apiKey,
+        trustedCa: settings.trustedCa,
+      ).catalog();
       _checkResult = (
         true,
         'З\'єднання є: шаблонів — ${catalog.templates.length}, '
@@ -110,7 +134,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               enableSuggestions: false,
               validator: (v) => (v ?? '').trim().isEmpty ? 'Вкажіть ключ' : null,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.verified_user_outlined),
+              title: const Text('Сертифікат CA'),
+              subtitle: Text(_trustedCa?.name ?? 'Не задано — лише системні сертифікати'),
+              trailing: _trustedCa == null
+                  ? null
+                  : IconButton(
+                      tooltip: 'Прибрати',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => setState(() {
+                        _trustedCa = null;
+                        _checkResult = null;
+                      }),
+                    ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _importCa,
+                icon: const Icon(Icons.file_open_outlined),
+                label: Text(_trustedCa == null ? 'Імпортувати…' : 'Замінити…'),
+              ),
+            ),
+            const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _checking ? null : _check,
               icon: _checking

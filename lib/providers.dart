@@ -8,7 +8,7 @@ import 'services/relay_settings.dart';
 final relayClientProvider = Provider<RelayClient?>((ref) {
   final settings = ref.watch(relaySettingsProvider).valueOrNull;
   if (settings == null || !settings.isConfigured) return null;
-  return RelayClient(baseUrl: settings.baseUrl, apiKey: settings.apiKey);
+  return RelayClient(baseUrl: settings.baseUrl, apiKey: settings.apiKey, trustedCa: settings.trustedCa);
 });
 
 /// Шаблони + одержувачі з relay. Оновлення — `ref.invalidate(catalogProvider)`.
