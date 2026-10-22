@@ -2,7 +2,7 @@
 
 Бекенд-мікросервіс для [xFastSignal](../../README.md). Приймає авторизований запит
 «надішли шаблон X одержувачу Y» і виконує його через `signal-cli` daemon на окремому
-(вилученому) сервері — образ із [xBot](<internal-git>/xBot.git). xBot при
+(вилученому) сервері — образ із проєкту xBot. xBot при
 цьому не змінюється.
 
 - **Стек:** ASP.NET Core minimal API, net10.0.
@@ -60,9 +60,9 @@ Signal__BaseUrl=http://<host-з-signal-cli>:<port> dotnet run
 # слухає http://localhost:5xxx
 ```
 
-**Розробка проти signal-cli xBot на `<signal-host>`.** Контейнер `<signal-cli-container>` сидить лише
-в docker-мережі `<xbot-network>` (порт на хост не опубліковано), тож — SSH-тунель на IP
-контейнера (IP може змінитися після перезапуску — дивіться щоразу):
+**Розробка проти signal-cli xBot.** Контейнер signal-cli на сервері xBot (`<signal-host>`)
+сидить лише у внутрішній docker-мережі (порт на хост не опубліковано), тож — SSH-тунель
+на IP контейнера (IP може змінитися після перезапуску — дивіться щоразу):
 
 ```sh
 IP=$(ssh <signal-host> 'docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" <signal-cli-container>')

@@ -26,7 +26,7 @@ Android-застосунок для швидкої (в ідеалі — авто
 
 ## Рішення: reuse напрацювань з xBot
 
-У проєкті `xBot` (`../xBot`) вже є робочий Signal-бот на ASP.NET Core (net10.0)
+У проєкті `xBot` (сусідній репозиторій) вже є робочий Signal-бот на ASP.NET Core (net10.0)
 з `signal-cli` у контейнері:
 
 - **Важливий нюанс**: xBot **мігрував з `signal-cli-rest-api` (REST) на власний
@@ -92,11 +92,14 @@ Android-застосунок для швидкої (в ідеалі — авто
   `screens/home_screen.dart` (поки що — список шаблонів/одержувачів з relay).
 - Debug-збірка дозволяє cleartext HTTP до `10.0.2.2`/`localhost`
   (`android/app/src/debug/res/xml/network_security_config.xml`); release — лише HTTPS.
-  Для `https://…<internal-domain>` у release треба буде довіра до внутрішнього CA.
+  Якщо relay буде за HTTPS із сертифікатом внутрішнього CA — release-збірці треба
+  буде явно довірити цей CA (`network_security_config`).
 - **Ще немає:** кнопок (шаблон → одержувач), відправки з UI, App Shortcuts.
 
-**Репозиторій:** `<internal-git>/xFastSignal.git` (Forgejo, основний,
-з 2026-10-21). GitHub `sovicUA/xFastSignal` — попередній origin.
+**Репозиторій:** основний — на внутрішньому Git-сервері (з 2026-10-21);
+[github.com/sovicUA/xFastSignal](https://github.com/sovicUA/xFastSignal) — **публічне**
+дзеркало (лише читання, синхронізується автоматично). Тому внутрішні адреси, хости,
+IP і шляхи до ключів у репо **не записуємо** — лише плейсхолдери.
 
 ## Вирішені питання
 
@@ -132,9 +135,9 @@ Android-застосунок для швидкої (в ідеалі — авто
    далі — Direct Share / віджет.
 3. **Бекенд:** admin-CRUD шаблонів і allowlist, rate limiting на `/send`, кілька
    API-ключів, валідація `Recipient.Value` (E.164 / groupId).
-4. **Деплой** relay на `<signal-host>` поруч із xBot (мережа `<xbot-network>`,
-   `Signal__BaseUrl=http://signal-cli:8080`, Traefik-хост на кшталт `relay.example.com`) —
-   прибере потребу в SSH-тунелі; **ще не узгоджено**, на сервер без явної команди не
+4. **Деплой** relay на сервер xBot поруч із signal-cli (у docker-мережі xBot,
+   `Signal__BaseUrl=http://signal-cli:8080`, за reverse proxy) — прибере потребу
+   в SSH-тунелі; **ще не узгоджено**, на сервер без явної команди не
    розгортати. Далі — перевірка на фізичному пристрої.
 
 ## Продовження на іншому ПК (2026-10-22)
@@ -142,9 +145,8 @@ Android-застосунок для швидкої (в ідеалі — авто
 ### Де зупинились
 
 Сесія 2026-10-21/22 (Windows-ПК, `D:\src\xFastSignal`):
-- Репо перенесено на `<internal-git>/xFastSignal.git` (`origin`).
-  Старий GitHub лишився як remote `github` і **відстає** — туди не пушили.
-- Бекенд перевірено наживо проти signal-cli xBot на `<signal-host>`: `/send` на контакт і
+- Репо перенесено на внутрішній Git-сервер (`origin`); GitHub — публічне дзеркало.
+- Бекенд перевірено наживо проти бойового signal-cli xBot: `/send` на контакт і
   на групу («xBot Test Group») — повідомлення доходять.
 - Зроблено каркас Flutter-клієнта (див. «Стан проєкту»). Аналізатор чистий, 7 тестів
   зелені, debug APK збирається. **На пристрої/емуляторі ще не запускали.**
@@ -154,16 +156,11 @@ Android-застосунок для швидкої (в ідеалі — авто
 
 ### Сетап нового ПК
 
-1. **SSH до <git-server>:** Forgejo слухає SSH на **порту 2222** (22 — sshd хоста).
-   Потрібні ключ `<ssh-key>` і блок `Host <git-server>`
-   (`Port 2222`, `User git`) у `<ssh-config>`, підключений
-   з `~/.ssh/config` через `Include`. Той самий ключ — для `ssh <signal-host>` (<signal-host-ip>,
-   user `viktor`).
+1. **Клон:** з основного (внутрішнього) сервера — адреса й SSH-доступ у документації
+   інфраструктури, не тут; або лише для читання — з публічного дзеркала:
    ```sh
-   git clone <internal-git>/xFastSignal.git
+   git clone https://github.com/sovicUA/xFastSignal.git
    ```
-   Якщо вже є стара копія з GitHub:
-   `git remote set-url origin <internal-git>/xFastSignal.git`.
 2. **Інструменти** (версії, на яких усе працює): Flutter 3.47.2 / Dart 3.13.2,
    .NET SDK 10.0.3xx, Java 21 (не новіша — Gradle/AGP), Android SDK 36.
    ```sh
@@ -174,17 +171,17 @@ Android-застосунок для швидкої (в ідеалі — авто
    `android/gradle.properties` має `kotlin.incremental=false` — без цього на Windows,
    коли проєкт і pub-кеш на різних дисках, збірка падає з «Could not close incremental
    caches».
-3. **Relay локально проти signal-cli на <signal-host>** — див.
-   `backend/xSignalRelay/README.md`, «Розробка проти signal-cli xBot на <signal-host>».
-   Коротко:
+3. **Relay локально проти signal-cli xBot** — див. `backend/xSignalRelay/README.md`,
+   «Розробка проти signal-cli xBot». Коротко (`<signal-host>` — SSH-хост сервера xBot,
+   `<signal-cli-container>` — ім'я контейнера signal-cli з `docker ps` на ньому):
    ```sh
    IP=$(ssh <signal-host> 'docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" <signal-cli-container>')
    while true; do ssh -N -o ServerAliveInterval=30 -L 18080:$IP:8080 <signal-host>; sleep 5; done &
    cd backend/xSignalRelay
    Signal__BaseUrl=http://localhost:18080 ASPNETCORE_URLS=http://localhost:5180 dotnet run
    ```
-   Тунель на цьому ПК двічі рвався з `Connection reset by peer` (keepalive не
-   допоміг) — звідси цикл. Статус relay: `http://localhost:5180/`.
+   Тунель двічі рвався з `Connection reset by peer` (keepalive не допоміг) — звідси
+   цикл. Статус relay: `http://localhost:5180/`.
 4. **Локальна БД `relay.db` не в git.** На новому ПК сид створить демо-шаблони й
    фіктивного одержувача `self-note` (`+380000000000`). Реальних одержувачів додати
    вручну, напр. Python `sqlite3` (колонка `Enabled` обов'язкова):
@@ -195,8 +192,7 @@ Android-застосунок для швидкої (в ідеалі — авто
    ```
    `groupId` — з `listGroups` через тунель:
    `curl -X POST localhost:18080/api/v1/rpc -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"listGroups","id":1}'`.
-   ⚠️ Номер xBot у групі «<реальна група>» (34 учасники) — **реальна** група,
-   для тестів не використовувати.
+   ⚠️ Номер xBot є і в **реальних** групах — для тестів брати лише «xBot Test Group».
 5. **Клієнт на телефоні** (емулятора на Windows-ПК не було): USB-налагодження, потім
    ```sh
    adb reverse tcp:5180 tcp:5180
@@ -232,10 +228,7 @@ Android-застосунок для швидкої (в ідеалі — авто
   dev-сертифікат довірено (`dotnet dev-certs https --trust`).
 - **Docker Desktop:** встановлено й запущено (перший запуск вимагав ручного
   прийняття ліцензії + пароля в GUI — з автоматизації не спрацювало).
-- **SSH до GitHub:** ключ `<ssh-key>`
-  (host-alias `github.com` у
-  `<ssh-config>`) спершу не працював —
-  публічний ключ довелось додати на GitHub-акаунт вручну через
+- **SSH до GitHub:** окремий ключ для GitHub спершу не працював — публічний ключ довелось додати на GitHub-акаунт вручну через
   Settings → SSH keys, після чого запрацював.
 - **Репозиторій `xBot`** склоновано в `~/src/xBot` (по SSH) —
   потрібен був лише заради `signal-cli/Dockerfile` (образ
@@ -249,9 +242,8 @@ Android-застосунок для швидкої (в ідеалі — авто
   env var `SIGNAL_BASE_URL` (коміт `602e7de`).
 - **`origin` remote** xFastSignal переключено з HTTPS на SSH
   (`git@github.com:sovicUA/xFastSignal.git`) — HTTPS на цьому Mac не мав
-  налаштованих credentials. *(З 2026-10-21 основний — <git-server>, див. «Стан проєкту»;
-  на Mac треба `git remote set-url origin <internal-git>/xFastSignal.git`
-  і SSH-ключ для <git-server>, порт 2222.)*
+  налаштованих credentials. *(З 2026-10-21 основний — внутрішній Git-сервер, див.
+  «Стан проєкту»; на Mac: `git remote set-url origin <адреса внутрішнього репо>`.)*
 
 ### Не зроблено / відкрито
 
