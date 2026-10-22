@@ -11,8 +11,9 @@ Android-застосунок для швидкої — в ідеалі авто�
 
 Три рівні:
 
-1. **signal-cli** (daemon у контейнері на окремому сервері) — тримає
-   зареєстрований/лінкований номер Signal, говорить JSON-RPC. Образ — з проєкту `xBot`.
+1. **signal-cli** (daemon у контейнері на сервері) — тримає зареєстрований/лінкований
+   номер Signal, говорить JSON-RPC. Образ і стек — окремий репозиторій **xSignal**
+   (спільний з xBot).
 2. **[`backend/xSignalRelay`](backend/xSignalRelay)** — тонкий ASP.NET Core (net10.0)
    мікросервіс: приймає авторизований запит «надішли шаблон X одержувачу Y» і виконує
    його через signal-cli. SQLite для шаблонів і allowlist одержувачів; клієнт бачить
@@ -29,6 +30,8 @@ Android-застосунок для швидкої — в ідеалі авто�
 |------|-----|
 | `lib/`, `android/` | Flutter-застосунок (org `ua.vn.log`, `applicationId ua.vn.log.xfastsignal`) |
 | `backend/xSignalRelay/` | бекенд-мікросервіс — див. його [README](backend/xSignalRelay/README.md) |
+| `deploy/fastsignal/` | стек relay на сервері: `compose.yml`, `deploy.sh`, приклади `.env` і сиду |
+| `.forgejo/workflows/ci.yml` | CI/CD (Forgejo Actions): збирання образу relay, ручне розгортання |
 | `NOTES.md` | архітектурні рішення та їх обґрунтування |
 
 ## Розробка

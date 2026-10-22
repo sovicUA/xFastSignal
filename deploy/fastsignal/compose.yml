@@ -1,0 +1,34 @@
+# xSignalRelay (xFastSignal backend) on the server, at https://<FASTSIGNAL_HOST> (through Traefik, LAN / VPN only).
+# Sends through the signal-cli daemon of the xSignal repository: http://signal-cli:8080 on the external Docker
+# network "signal".
+# On the server: ~/containers/fastsignal.<domain> (vars.FASTSIGNAL_STAND_DIR); CI copies this file and deploy.sh
+# there and runs it. Server-only files next to it (not committed): .env (from .env.example), appsettings.Production.json
+# (from appsettings.Production.json.example: templates and recipients with real numbers), data/ (SQLite), backups/.
+name: fastsignal
+
+services:
+  relay:
+    image: ${FASTSIGNAL_IMAGE_PREFIX:?}/xsignalrelay:${FASTSIGNAL_TAG:?}
+    environment:
+      Signal__BaseUrl: http://signal-cli:8080
+      ApiKey: ${RELAY_API_KEY:?}
+      Db__Path: /app/data/relay.db
+    volumes:
+      - ./data:/app/data
+      # Seed for the empty database (Seed:Enabled, Templates, Recipients) until there is an admin API
+      - ./appsettings.Production.json:/app/appsettings.Production.json:ro
+    networks: [signal, proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      # TLS (step-ca certificate) comes from the websecure entry point: no "tls" label (xInfra docs/deploy/lb.md)
+      traefik.http.routers.fastsignal.rule: Host(`${FASTSIGNAL_HOST:?}`)
+      traefik.http.routers.fastsignal.entrypoints: websecure
+      traefik.http.services.fastsignal.loadbalancer.server.port: "8080"
+    restart: unless-stopped
+
+networks:
+  signal:
+    external: true
+  proxy:
+    external: true

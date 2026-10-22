@@ -1,0 +1,14 @@
+{
+  "Seed": {
+    "Enabled": true,
+    "Templates": [
+      { "id": "running-late", "name": "Запізнююсь", "body": "Буду пізніше хвилин на {minutes}." },
+      { "id": "on-my-way", "name": "Виїхав", "body": "Виїхав, скоро буду." },
+      { "id": "arrived", "name": "На місці", "body": "Я на місці." }
+    ],
+    "Recipients": [
+      { "id": "self-note", "kind": "Contact", "value": "+380XXXXXXXXX", "displayName": "Собі (нотатка)" },
+      { "id": "test-group", "kind": "Group", "value": "<groupId>", "displayName": "xBot Test Group" }
+    ]
+  }
+}

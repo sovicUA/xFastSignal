@@ -1,9 +1,9 @@
 # xSignalRelay
 
 Бекенд-мікросервіс для [xFastSignal](../../README.md). Приймає авторизований запит
-«надішли шаблон X одержувачу Y» і виконує його через `signal-cli` daemon на окремому
-(вилученому) сервері — образ із проєкту xBot. xBot при
-цьому не змінюється.
+«надішли шаблон X одержувачу Y» і виконує його через `signal-cli` daemon — окремий стек
+`signal` з репозиторію **xSignal**, спільний з xBot (той самий номер; xBot при цьому не
+змінюється).
 
 - **Стек:** ASP.NET Core minimal API, net10.0.
 - **Сховище:** SQLite (шаблони + allowlist одержувачів), редагується в рантаймі.
@@ -60,9 +60,10 @@ Signal__BaseUrl=http://<host-з-signal-cli>:<port> dotnet run
 # слухає http://localhost:5xxx
 ```
 
-**Розробка проти signal-cli xBot.** Контейнер signal-cli на сервері xBot (`<signal-host>`)
-сидить лише у внутрішній docker-мережі (порт на хост не опубліковано), тож — SSH-тунель
-на IP контейнера (IP може змінитися після перезапуску — дивіться щоразу):
+**Розробка проти signal-cli на сервері.** Контейнер signal-cli (стек `signal` з xSignal,
+`<signal-cli-container>` у `docker ps`) на сервері (`<signal-host>`) сидить лише в мережі Docker
+`signal` (порт на хост не опубліковано), тож — SSH-тунель на IP контейнера (IP може змінитися
+після перезапуску — дивіться щоразу):
 
 ```sh
 IP=$(ssh <signal-host> 'docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" <signal-cli-container>')
@@ -89,6 +90,22 @@ curl -X POST http://localhost:5xxx/send \
 RELAY_API_KEY=$(openssl rand -hex 24) SIGNAL_BASE_URL=http://<host-з-signal-cli>:<port> \
   docker compose up -d --build
 # relay на порту 8082 хоста
+```
+
+## Розгортання на сервері
+
+Стек [`deploy/fastsignal/`](../../deploy/fastsignal) → `~/containers/fastsignal.<домен>`,
+`https://fastsignal.<домен>` (Traefik, внутрішній CA, лише LAN / VPN). Relay — у мережах Docker
+`signal` (signal-cli зі стеку xSignal, `http://signal-cli:8080`) і `proxy`; порт на хост не
+публікується. Образ збирає й розгортає CI репозиторію (`.forgejo/workflows/ci.yml`, ручний запуск
+на `main`). Лише на сервері: `.env` (`RELAY_API_KEY`), `appsettings.Production.json` (сид шаблонів
+і одержувачів з реальними номерами), `data/relay.db`, `backups/`. Деталі й рішення — NOTES.md,
+«Розгортання».
+
+```sh
+cd ~/containers/fastsignal.<домен>
+docker compose --env-file .env logs -f relay     # журнал
+./deploy.sh <попередній тег>                     # відкат
 ```
 
 ## Конфігурація

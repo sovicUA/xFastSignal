@@ -1,6 +1,6 @@
-# Піднімає лише relay. signal-cli тут не запускається — він працює на окремому
-# (вилученому) сервері, тож relay звертається до нього напряму по мережі, без
-# спільної docker-мережі з xBot.
+# Локальний запуск лише relay (напр. проти SSH-тунелю до signal-cli). signal-cli тут не
+# запускається — це стек `signal` з репозиторію xSignal. Розгортання на сервер —
+# deploy/fastsignal/ (мережа Docker `signal`, Traefik).
 #
 # Запуск: RELAY_API_KEY=... SIGNAL_BASE_URL=http://<host>:<port> docker compose up -d --build
 # (або покласти RELAY_API_KEY і SIGNAL_BASE_URL у .env поряд із цим файлом)

@@ -1,0 +1,74 @@
+# xFastSignal CI/CD on Forgejo Actions (runner label "xbot-ci" - the runner of the xAuto organization, xBot deploy/runner).
+# Only the backend (xSignalRelay); the Flutter client is built on a PC.
+#   every push / pull request: build the xsignalrelay image on the server's Docker, then remove it
+#   run by hand (main):        the same + push the image to the Forgejo registry (:<12-char commit> and :latest)
+#                              + deploy it to the server (deploy/fastsignal/deploy.sh in vars.FASTSIGNAL_STAND_DIR)
+#   (no automatic deployment: only by hand - repository -> Actions -> CI -> Run workflow)
+# Organization settings -> Actions (shared with xBot): variables IMAGE_PREFIX, REGISTRY_USER; secret REGISTRY_TOKEN.
+# Repository settings -> Actions: variable FASTSIGNAL_STAND_DIR (relay directory on the server, full path; the runner
+# mounts it into the job containers - xBot deploy/runner/config.yml.example).
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: xbot-ci
+    steps:
+      - name: Checkout
+        run: |
+          git init -q .
+          git -c http.extraHeader="Authorization: token ${{ forgejo.token }}" \
+            fetch -q --depth 1 "${{ forgejo.server_url }}/${{ forgejo.repository }}.git" "${{ forgejo.sha }}"
+          git checkout -q FETCH_HEAD
+      - name: Build xsignalrelay
+        run: docker build -t "xsignalrelay:ci-${{ forgejo.sha }}" backend/xSignalRelay
+      - name: Remove the image (not published)
+        if: always() && (forgejo.ref != 'refs/heads/main' || forgejo.event_name != 'workflow_dispatch' || failure())
+        run: |
+          docker rmi "xsignalrelay:ci-${{ forgejo.sha }}" || true
+          docker image prune -f
+
+  publish:
+    needs: build
+    # Only by hand, from main
+    if: forgejo.ref == 'refs/heads/main' && forgejo.event_name == 'workflow_dispatch'
+    runs-on: xbot-ci
+    steps:
+      - name: Push the image
+        run: |
+          set -eu
+          tag="$(echo "${{ forgejo.sha }}" | cut -c1-12)"
+          registry="${IMAGE_PREFIX%%/*}"
+          echo "${{ secrets.REGISTRY_TOKEN }}" | docker login "$registry" -u "${{ vars.REGISTRY_USER }}" --password-stdin
+          # Built by the build job on the same host's Docker
+          docker tag "xsignalrelay:ci-${{ forgejo.sha }}" "$IMAGE_PREFIX/xsignalrelay:$tag"
+          docker tag "xsignalrelay:ci-${{ forgejo.sha }}" "$IMAGE_PREFIX/xsignalrelay:latest"
+          docker push "$IMAGE_PREFIX/xsignalrelay:$tag"
+          docker push "$IMAGE_PREFIX/xsignalrelay:latest"
+          docker rmi "xsignalrelay:ci-${{ forgejo.sha }}"
+        env:
+          IMAGE_PREFIX: ${{ vars.IMAGE_PREFIX }}
+
+  deploy:
+    needs: publish
+    runs-on: xbot-ci
+    steps:
+      - name: Checkout
+        run: |
+          git init -q .
+          git -c http.extraHeader="Authorization: token ${{ forgejo.token }}" \
+            fetch -q --depth 1 "${{ forgejo.server_url }}/${{ forgejo.repository }}.git" "${{ forgejo.sha }}"
+          git checkout -q FETCH_HEAD
+      - name: Deploy to the server
+        run: |
+          set -eu
+          tag="$(echo "${{ forgejo.sha }}" | cut -c1-12)"
+          install -m 644 deploy/fastsignal/compose.yml "$STAND_DIR/compose.yml"
+          install -m 755 deploy/fastsignal/deploy.sh "$STAND_DIR/deploy.sh"
+          "$STAND_DIR/deploy.sh" "$tag"
+        env:
+          STAND_DIR: ${{ vars.FASTSIGNAL_STAND_DIR }}

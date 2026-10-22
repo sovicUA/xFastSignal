@@ -56,6 +56,10 @@ Android-застосунок для швидкої (в ідеалі — авто
 > signal-cli по JSON-RPC (метод `send`, send-only). xBot не змінюється.
 > **Переглянуто (2026-09-15):** signal-cli працює на окремому (вилученому) сервері;
 > relay звертається до нього за `SIGNAL_BASE_URL`, без спільної docker-мережі з xBot.
+> **Переглянуто (2026-10-22):** образ і daemon signal-cli винесено з xBot в окремий репозиторій
+> **xSignal** (сусідній) і окремий стек на сервері; xBot і relay — рівноправні клієнти через
+> спільну мережу Docker `signal` (`http://signal-cli:8080`). Relay розгортається на тому ж
+> сервері — див. «Розгортання».
 
 ### Безпека
 
@@ -68,7 +72,7 @@ Android-застосунок для швидкої (в ідеалі — авто
 лише за opaque `id` (сирі номери/groupId не залишають бекенд), авторизація —
 заголовок `X-Api-Key`.
 
-## Стан проєкту (оновлено 2026-10-21)
+## Стан проєкту (оновлено 2026-10-22)
 
 **Бекенд `xSignalRelay` — робочий:**
 - `GET /templates`, `GET /recipients`, `POST /send` (коди `400/403/404/502`),
@@ -76,8 +80,10 @@ Android-застосунок для швидкої (в ідеалі — авто
 - SQLite (EF Core, міграція `Initial`), сид демо-даних з конфіга.
 - Сторінка статусу `/` (health check signal-cli кожні 30 с, останні 5 відправок),
   Swagger `/swagger` (поза Development — за ключем).
-- Docker: `docker compose up` з `RELAY_API_KEY` + `SIGNAL_BASE_URL`, порт 8082,
+- Docker локально: `docker compose up` з `RELAY_API_KEY` + `SIGNAL_BASE_URL`, порт 8082,
   том `relay-data`.
+- **Розгортання на сервер** (з 2026-10-22): `deploy/fastsignal/` + `.forgejo/workflows/ci.yml`
+  — див. розділ «Розгортання».
 
 **Клієнт Flutter — каркас (2026-10-21):**
 - `flutter create --org ua.vn.log --project-name xfastsignal --platforms android -a kotlin`.
@@ -92,8 +98,8 @@ Android-застосунок для швидкої (в ідеалі — авто
   `screens/home_screen.dart` (поки що — список шаблонів/одержувачів з relay).
 - Debug-збірка дозволяє cleartext HTTP до `10.0.2.2`/`localhost`
   (`android/app/src/debug/res/xml/network_security_config.xml`); release — лише HTTPS.
-  Якщо relay буде за HTTPS із сертифікатом внутрішнього CA — release-збірці треба
-  буде явно довірити цей CA (`network_security_config`).
+  Relay на сервері — за HTTPS із сертифікатом **внутрішнього CA**: release-збірці треба
+  явно довірити цей CA (`network_security_config`) — інакше з телефона не підключиться.
 - **Ще немає:** кнопок (шаблон → одержувач), відправки з UI, App Shortcuts.
 
 **Репозиторій:** основний — на внутрішньому Git-сервері (з 2026-10-21);
@@ -135,10 +141,32 @@ IP і шляхи до ключів у репо **не записуємо** — �
    далі — Direct Share / віджет.
 3. **Бекенд:** admin-CRUD шаблонів і allowlist, rate limiting на `/send`, кілька
    API-ключів, валідація `Recipient.Value` (E.164 / groupId).
-4. **Деплой** relay на сервер xBot поруч із signal-cli (у docker-мережі xBot,
-   `Signal__BaseUrl=http://signal-cli:8080`, за reverse proxy) — прибере потребу
-   в SSH-тунелі; **ще не узгоджено**, на сервер без явної команди не
-   розгортати. Далі — перевірка на фізичному пристрої.
+4. ~~**Деплой** relay на сервер~~ — узгоджено 2026-10-22, файли й CI готові (розділ
+   «Розгортання»); перше розгортання — за кроками там. Далі — довіра до внутрішнього CA
+   в release-збірці й перевірка на фізичному пристрої (з LAN і через VPN).
+
+## Розгортання (узгоджено 2026-10-22)
+
+- **Де:** той самий сервер, що й signal-cli (стек `signal` з репозиторію xSignal); стек
+  `fastsignal` у `~/containers/fastsignal.<домен>`, адреса `https://fastsignal.<домен>`
+  (Traefik, сертифікат внутрішнього CA).
+- **Доступ:** лише LAN і VPN до LAN — назовні не відкривається (relay надсилає від
+  бойового номера; публічний доступ вимагав би rate limiting і кількох ключів).
+- **Мережі Docker:** `signal` (до `http://signal-cli:8080`) і `proxy` (Traefik); порт на
+  хост не публікується.
+- **CI** (`.forgejo/workflows/ci.yml`, раннер організації xAuto, мітка `xbot-ci`): push —
+  збирання образу `xsignalrelay` з `backend/xSignalRelay`; ручний запуск на `main` —
+  публікація `git.<домен>/xauto/xsignalrelay:<12 символів коміту>` і розгортання
+  (`deploy/fastsignal/deploy.sh`: резервна копія `data/`, запуск, перевірка
+  `"state":"Online"` у `/api/status`). Змінна репозиторію `FASTSIGNAL_STAND_DIR`; раннер
+  монтує цю теку (xBot `deploy/runner/config.yml.example`).
+- **Лише на сервері:** `.env` (`RELAY_API_KEY` — згенерувати там, у застосунок ввести
+  вручну), `appsettings.Production.json` — сид шаблонів і одержувачів **з реальними
+  номерами** (поки немає admin-CRUD; діє лише на порожні таблиці — далі правка БД),
+  `data/relay.db`, `backups/`.
+
+Перше розгортання: тека + `.env` + `appsettings.Production.json` на сервері → змінна
+`FASTSIGNAL_STAND_DIR` → тека в `config.yml` раннера → ручний запуск CI.
 
 ## Продовження на іншому ПК (2026-10-22)
 
@@ -175,9 +203,9 @@ IP і шляхи до ключів у репо **не записуємо** — �
    `android/gradle.properties` має `kotlin.incremental=false` — без цього на Windows,
    коли проєкт і pub-кеш на різних дисках, збірка падає з «Could not close incremental
    caches».
-3. **Relay локально проти signal-cli xBot** — див. `backend/xSignalRelay/README.md`,
-   «Розробка проти signal-cli xBot». Коротко (`<signal-host>` — SSH-хост сервера xBot,
-   `<signal-cli-container>` — ім'я контейнера signal-cli з `docker ps` на ньому):
+3. **Relay локально проти signal-cli на сервері** — див. `backend/xSignalRelay/README.md`,
+   «Розробка проти signal-cli на сервері». Коротко (`<signal-host>` — SSH-хост сервера,
+   `<signal-cli-container>` — контейнер signal-cli стеку `signal` (xSignal), з `docker ps`):
    ```sh
    IP=$(ssh <signal-host> 'docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" <signal-cli-container>')
    while true; do ssh -N -o ServerAliveInterval=30 -L 18080:$IP:8080 <signal-host>; sleep 5; done &
@@ -206,6 +234,10 @@ IP і шляхи до ключів у репо **не записуємо** — �
    (debug-збірка дозволяє HTTP лише до `localhost` / `10.0.2.2`).
 
 ## Перенесення розробки на Mac (2026-09-15)
+
+> Історичний розділ. З 2026-10-22 образ signal-cli — з репозиторію **xSignal** (не
+> `xBot/signal-cli/`), тож для нативного arm64-образу клонувати xSignal і
+> `docker build --platform linux/arm64 -t signal-cli:arm64 .` у його корені.
 
 Дата: 2026-09-15. Налаштовували середовище на першому Mac (Apple Silicon, macOS 27).
 Планується продовжити на іншому Mac-пристрої — нижче стан і що лишилось.
