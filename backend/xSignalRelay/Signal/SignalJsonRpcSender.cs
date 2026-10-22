@@ -37,6 +37,8 @@ public sealed class SignalJsonRpcSender(HttpClient http, ILogger<SignalJsonRpcSe
     /// До 3 спроб з невеликою паузою: на "холодному старті" (щойно піднятий daemon) перший
     /// виклик іноді падає з "Failed to send message" без деталей, а миттєвий ідентичний повтор
     /// проходить (емпірика xBot, 2026-08-10). Для сповіщень втрачена відправка гірша за рідкісний дубль.
+    /// Після тайм-ауту чи скасування — без повтору: signal-cli міг уже надіслати (лише повільно), повтор дав би
+    /// гарантований дубль (перша відправка в групу, 2026-10-22: понад 15 с).
     /// </summary>
     private async Task SendAsync(SignalSendParams @params, CancellationToken ct)
     {
@@ -47,7 +49,7 @@ public sealed class SignalJsonRpcSender(HttpClient http, ILogger<SignalJsonRpcSe
                 await SendOnceAsync(@params, ct);
                 return;
             }
-            catch (Exception ex) when (attempt < MaxAttempts)
+            catch (Exception ex) when (attempt < MaxAttempts && ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex, "Signal send: спроба {Attempt}/{Max} не вдалась, повтор через {Delay}",
                     attempt, MaxAttempts, RetryDelay);

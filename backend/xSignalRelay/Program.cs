@@ -17,7 +17,8 @@ builder.Services.AddDbContext<RelayDbContext>(options =>
 builder.Services.AddHttpClient<ISignalSender, SignalJsonRpcSender>(client =>
 {
     client.BaseAddress = new Uri(signalBaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(30);
+    // Перша відправка в групу буває 15+ с (signal-cli тягне дані групи й ключі)
+    client.Timeout = TimeSpan.FromSeconds(60);
 });
 
 builder.Services.AddSingleton<ISignalStatusRegistry, SignalStatusRegistry>();

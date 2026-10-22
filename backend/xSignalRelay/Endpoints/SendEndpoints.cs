@@ -44,12 +44,14 @@ public static class SendEndpoints
                 return Results.BadRequest(new { error = ex.Message, key = ex.Key });
             }
 
+            // Без токена запиту: прийняту відправку доводимо до кінця, навіть якщо клієнт перестав чекати
+            // (перша відправка в групу в signal-cli буває 15+ с) — signal-cli однаково її доставить.
             try
             {
                 if (recipient.Kind == RecipientKind.Group)
-                    await signal.SendToGroupAsync(message, recipient.Value, ct);
+                    await signal.SendToGroupAsync(message, recipient.Value, CancellationToken.None);
                 else
-                    await signal.SendToContactAsync(message, recipient.Value, ct);
+                    await signal.SendToContactAsync(message, recipient.Value, CancellationToken.None);
             }
             catch (Exception ex)
             {

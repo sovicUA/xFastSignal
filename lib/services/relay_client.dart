@@ -44,17 +44,25 @@ class RelayClient {
   Future<Catalog> catalog() async =>
       Catalog(templates: await templates(), recipients: await recipients());
 
+  /// Скільки чекати відповіді на `/send`: перша відправка в групу в signal-cli буває 15+ с,
+  /// relay чекає на signal-cli до 60 с.
+  static const sendTimeout = Duration(seconds: 90);
+
   /// `POST /send`. Успіх — `202`; інакше кидає [RelayException].
   Future<void> send({
     required String templateId,
     required String target,
     Map<String, String>? params,
   }) =>
-      _call(() => _dio.post<void>('/send', data: {
-            'templateId': templateId,
-            'target': target,
-            if (params != null && params.isNotEmpty) 'params': params,
-          }));
+      _call(() => _dio.post<void>(
+            '/send',
+            data: {
+              'templateId': templateId,
+              'target': target,
+              if (params != null && params.isNotEmpty) 'params': params,
+            },
+            options: Options(receiveTimeout: sendTimeout),
+          ));
 
   Future<T> _get<T>(String path) async {
     final response = await _call(() => _dio.get<T>(path));
