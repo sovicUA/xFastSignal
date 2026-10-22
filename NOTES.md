@@ -1,7 +1,8 @@
 # xFastSignal — нотатки та архітектурні рішення
 
 Початок: 2026-09-05. Поточний стан і наступні кроки — розділи «Стан проєкту» і
-«Наступні кроки» нижче.
+«Наступні кроки» нижче; як підхопити роботу на іншій машині — «Продовження на
+іншому ПК».
 Сесія-джерело: обговорення велось у теці xSilent, перед перемиканням на xFastSignal.
 
 ## Ідея
@@ -131,7 +132,78 @@ Android-застосунок для швидкої (в ідеалі — авто
    далі — Direct Share / віджет.
 3. **Бекенд:** admin-CRUD шаблонів і allowlist, rate limiting на `/send`, кілька
    API-ключів, валідація `Recipient.Value` (E.164 / groupId).
-4. **Деплой** relay поруч із вилученим signal-cli і перевірка на фізичному пристрої.
+4. **Деплой** relay на `<signal-host>` поруч із xBot (мережа `<xbot-network>`,
+   `Signal__BaseUrl=http://signal-cli:8080`, Traefik-хост на кшталт `relay.example.com`) —
+   прибере потребу в SSH-тунелі; **ще не узгоджено**, на сервер без явної команди не
+   розгортати. Далі — перевірка на фізичному пристрої.
+
+## Продовження на іншому ПК (2026-10-22)
+
+### Де зупинились
+
+Сесія 2026-10-21/22 (Windows-ПК, `D:\src\xFastSignal`):
+- Репо перенесено на `<internal-git>/xFastSignal.git` (`origin`).
+  Старий GitHub лишився як remote `github` і **відстає** — туди не пушили.
+- Бекенд перевірено наживо проти signal-cli xBot на `<signal-host>`: `/send` на контакт і
+  на групу («xBot Test Group») — повідомлення доходять.
+- Зроблено каркас Flutter-клієнта (див. «Стан проєкту»). Аналізатор чистий, 7 тестів
+  зелені, debug APK збирається. **На пристрої/емуляторі ще не запускали.**
+- **Наступна задача:** кнопки «шаблон → одержувач» (модель + збереження в
+  SharedPreferences, редактор, сітка на головному, відправка з Undo ~3 с) — за
+  «Баченням клієнта» вище.
+
+### Сетап нового ПК
+
+1. **SSH до <git-server>:** Forgejo слухає SSH на **порту 2222** (22 — sshd хоста).
+   Потрібні ключ `<ssh-key>` і блок `Host <git-server>`
+   (`Port 2222`, `User git`) у `<ssh-config>`, підключений
+   з `~/.ssh/config` через `Include`. Той самий ключ — для `ssh <signal-host>` (<signal-host-ip>,
+   user `viktor`).
+   ```sh
+   git clone <internal-git>/xFastSignal.git
+   ```
+   Якщо вже є стара копія з GitHub:
+   `git remote set-url origin <internal-git>/xFastSignal.git`.
+2. **Інструменти** (версії, на яких усе працює): Flutter 3.47.2 / Dart 3.13.2,
+   .NET SDK 10.0.3xx, Java 21 (не новіша — Gradle/AGP), Android SDK 36.
+   ```sh
+   flutter pub get
+   flutter analyze && flutter test
+   flutter build apk --debug   # перша збірка ~10 хв (Gradle тягне залежності)
+   ```
+   `android/gradle.properties` має `kotlin.incremental=false` — без цього на Windows,
+   коли проєкт і pub-кеш на різних дисках, збірка падає з «Could not close incremental
+   caches».
+3. **Relay локально проти signal-cli на <signal-host>** — див.
+   `backend/xSignalRelay/README.md`, «Розробка проти signal-cli xBot на <signal-host>».
+   Коротко:
+   ```sh
+   IP=$(ssh <signal-host> 'docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" <signal-cli-container>')
+   while true; do ssh -N -o ServerAliveInterval=30 -L 18080:$IP:8080 <signal-host>; sleep 5; done &
+   cd backend/xSignalRelay
+   Signal__BaseUrl=http://localhost:18080 ASPNETCORE_URLS=http://localhost:5180 dotnet run
+   ```
+   Тунель на цьому ПК двічі рвався з `Connection reset by peer` (keepalive не
+   допоміг) — звідси цикл. Статус relay: `http://localhost:5180/`.
+4. **Локальна БД `relay.db` не в git.** На новому ПК сид створить демо-шаблони й
+   фіктивного одержувача `self-note` (`+380000000000`). Реальних одержувачів додати
+   вручну, напр. Python `sqlite3` (колонка `Enabled` обов'язкова):
+   ```sql
+   UPDATE Recipients SET Value = '+380…' WHERE Id = 'self-note';           -- свій номер
+   INSERT INTO Recipients (Id, Kind, Value, DisplayName, Enabled)
+     VALUES ('test-group', 'Group', '<groupId>', 'xBot Test Group', 1);
+   ```
+   `groupId` — з `listGroups` через тунель:
+   `curl -X POST localhost:18080/api/v1/rpc -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"listGroups","id":1}'`.
+   ⚠️ Номер xBot у групі «<реальна група>» (34 учасники) — **реальна** група,
+   для тестів не використовувати.
+5. **Клієнт на телефоні** (емулятора на Windows-ПК не було): USB-налагодження, потім
+   ```sh
+   adb reverse tcp:5180 tcp:5180
+   flutter run
+   ```
+   У налаштуваннях застосунку: `http://localhost:5180`, ключ `dev-local-key`
+   (debug-збірка дозволяє HTTP лише до `localhost` / `10.0.2.2`).
 
 ## Перенесення розробки на Mac (2026-09-15)
 
