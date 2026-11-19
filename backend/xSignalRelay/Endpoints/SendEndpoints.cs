@@ -35,9 +35,10 @@ public static class SendEndpoints
                     statusCode: StatusCodes.Status403Forbidden);
 
             string message;
+            IReadOnlyList<string> styles;
             try
             {
-                message = PlaceholderParser.Render(template.Body, body.Params);
+                (message, styles) = PlaceholderParser.RenderStyled(template.Body, body.Params);
             }
             catch (TemplateRenderException ex)
             {
@@ -49,9 +50,9 @@ public static class SendEndpoints
             try
             {
                 if (recipient.Kind == RecipientKind.Group)
-                    await signal.SendToGroupAsync(message, recipient.Value, CancellationToken.None);
+                    await signal.SendToGroupAsync(message, recipient.Value, styles, CancellationToken.None);
                 else
-                    await signal.SendToContactAsync(message, recipient.Value, CancellationToken.None);
+                    await signal.SendToContactAsync(message, recipient.Value, styles, CancellationToken.None);
             }
             catch (Exception ex)
             {

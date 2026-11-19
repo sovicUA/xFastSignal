@@ -36,6 +36,11 @@ public sealed class SignalSendParams
     [JsonPropertyName("message")] public string Message { get; set; } = string.Empty;
     [JsonPropertyName("recipient")] public List<string>? Recipient { get; set; }
     [JsonPropertyName("groupId")] public string? GroupId { get; set; }
+
+    /// <summary>Офсети "start:length:STYLE" у UTF-16 code units — нативний формат signal-cli (як у xBot).</summary>
+    [JsonPropertyName("textStyles")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? TextStyles { get; set; }
 }
 
 /// <summary>Params для методів без аргументів (напр. "version") — серіалізується як "{}".</summary>

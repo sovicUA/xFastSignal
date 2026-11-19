@@ -13,11 +13,15 @@ public sealed class SignalJsonRpcSender(HttpClient http, ILogger<SignalJsonRpcSe
     private const int MaxAttempts = 3;
     private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(500);
 
-    public Task SendToContactAsync(string message, string e164, CancellationToken ct = default) =>
-        SendAsync(new SignalSendParams { Message = message, Recipient = [e164] }, ct);
+    public Task SendToContactAsync(string message, string e164, IReadOnlyList<string>? textStyles = null, CancellationToken ct = default) =>
+        SendAsync(new SignalSendParams { Message = message, Recipient = [e164], TextStyles = Styles(textStyles) }, ct);
 
-    public Task SendToGroupAsync(string message, string groupId, CancellationToken ct = default) =>
-        SendAsync(new SignalSendParams { Message = message, GroupId = groupId }, ct);
+    public Task SendToGroupAsync(string message, string groupId, IReadOnlyList<string>? textStyles = null, CancellationToken ct = default) =>
+        SendAsync(new SignalSendParams { Message = message, GroupId = groupId, TextStyles = Styles(textStyles) }, ct);
+
+    // Без стилів поле не передається зовсім (запит той самий, що й до розмітки)
+    private static List<string>? Styles(IReadOnlyList<string>? textStyles) =>
+        textStyles is { Count: > 0 } ? textStyles.ToList() : null;
 
     public async Task<string> GetVersionAsync(CancellationToken ct = default)
     {
